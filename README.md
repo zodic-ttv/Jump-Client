@@ -14,7 +14,7 @@ cd Jump-Client
 npm install
 npm start
 
-// run this stuff in powershell
+// ^^^ run this stuff in powershell
 
 // for uncapping fps turn on uncap fps then restart
 // use: https://github.com/bigjakk/Electron-Websocket-Fix/releases. 
