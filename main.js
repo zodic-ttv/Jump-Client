@@ -1,3 +1,5 @@
+
+
 const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -6,9 +8,14 @@ const internalCssDir = path.join(__dirname, 'Assets', 'css');
 const baseDir = app.isPackaged ? path.dirname(process.execPath) : __dirname;
 const dirs = {
   css: path.join(baseDir, 'css'),
-  scripts: path.join(baseDir, 'scripts')
+  scripts: path.join(baseDir, 'scripts'),
+  Builtinscripts: path.join(__dirname, 'Builtinscripts')
 };
-const exts = { css: '.css', scripts: '.js' };
+const exts = {
+  css: '.css',
+  scripts: '.js',
+  Builtinscripts: '.js'
+};
 const configPath = path.join(app.getPath('userData'), 'client-config.json');
 const cssKeys = new Map();
 let skipUnloadPrompt = false;
@@ -102,12 +109,17 @@ function filePath(type, name) {
   return path.join(dirs[type], path.basename(name));
 }
 
+
 function listFiles(type) {
-  const disabled = loadConfig().disabled[type];
+  const disabled = loadConfig().disabled[type] || [];
+
   return fs
     .readdirSync(dirs[type])
     .filter((name) => name.toLowerCase().endsWith(exts[type]))
-    .map((name) => ({ name, enabled: !disabled.includes(name) }));
+    .map((name) => ({
+      name,
+      enabled: !disabled.includes(name)
+    }));
 }
 
 function openInEditor(file) {
@@ -147,17 +159,52 @@ async function applyInternalCss(webContents) {
     }
   }
 }
+
 async function applyScripts(webContents) {
-  for (const file of listFiles('scripts')) {
-    if (!file.enabled) continue;
-    try {
-      const code = fs.readFileSync(filePath('scripts', file.name), 'utf8');
-      await webContents.executeJavaScript('(function(){\n' + code + '\n})();');
-    } catch (err) {
-      console.error('Userscript error in', file.name, err);
+    const url = webContents.getURL();
+    const isEditor = new URL(url).pathname.endsWith("/editor.html");
+
+    for (const type of ["scripts", "Builtinscripts"]) {
+      
+        for (const file of listFiles(type)) {
+            console.log(
+                "[Script Loader]",
+                type,
+                file.name,
+                "enabled:",
+                file.enabled,
+                "URL:",
+                webContents.getURL()
+            );
+            if (!file.enabled) continue;
+
+            if (
+                type === "Builtinscripts" &&
+                file.name === "AdvancedGroupEditTool.js" &&
+                !isEditor
+            ) {
+                continue;
+            }
+
+            try {
+                const code = fs.readFileSync(
+                    filePath(type, file.name),
+                    "utf8"
+                );
+
+                await webContents.executeJavaScript(
+                    "(function(){\n" + code + "\n})();"
+                );
+            } catch (err) {
+                console.error(
+                    `Userscript error in ${type}/${file.name}`,
+                    err
+                );
+            }
+        }
     }
-  }
 }
+
 
 function isGameUrl(url) {
   try {
