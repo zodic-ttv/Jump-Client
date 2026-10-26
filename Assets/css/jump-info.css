@@ -1,0 +1,34 @@
+#subLogoButtons .popRail[data-jump-info],
+#subLogoButtons .popRail[data-jump-info] * {
+  pointer-events: none !important;
+}
+
+#subLogoButtons .popRail[data-jump-info] {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+#subLogoButtons .popRail[data-jump-info] .popRailCards {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+#subLogoButtons .popRail[data-jump-info] .popRailCard[data-jump-info-created] {
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 8px 12px !important;
+}
+
+#subLogoButtons .popRail[data-jump-info] .popRailHeader {
+  margin-bottom: 4px;
+}
+
+.jumpInfoStats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.25;
+  text-align: left;
+  white-space: nowrap;
+}
