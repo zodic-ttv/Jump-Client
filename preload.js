@@ -1,7 +1,7 @@
 const { ipcRenderer, webFrame } = require('electron');
 const { createSettingsUi, settingsStyle } = require('./settings-ui');
 const settings = ipcRenderer.sendSync('settings:get');
-
+const { applyEditorTweaks } = require('./editortweaks');
 const fs = require('fs');
 const path = require('path');
 const { error } = require('console');
@@ -227,17 +227,18 @@ window.addEventListener('DOMContentLoaded', () => {
     subtree: true
   });
 
-  // One interval only, instead of creating a new one
-  // every time the DOM changes.
-  setInterval(() => {
-    if (document.pointerLockElement) return;
+    setInterval(() => {
+      watchTeamName();
+      if (settings.Editortweakstoggle) applyEditorTweaks();
 
-    dismissClientPopup();
-    changegamenameholder();
+      if (document.pointerLockElement) return;
 
-    if (settings.jumpInfo) replacepopularnow();
+      dismissClientPopup();
+      changegamenameholder();
 
-    settingsUi.ensureSections();
-    watchTeamName();
-  }, 1000);
+      if (settings.jumpInfo) replacepopularnow();
+
+      settingsUi.ensureSections();
+
+    }, 1000);
 });

@@ -38,16 +38,17 @@ function createSettingsUi(settings, onSettingChanged) {
 					label: 'Parkour maps list:' 
 				},
 				{ 
-					type: 'link', 
-					key: 'https://docs.google.com/spreadsheets/d/1Gx8TM1T2aOdHSR2qFR9Y9F63638gFEfBBQondoNAsX0/edit?usp=sharing', 
-					label: 'Slide maps list:' 
-				}, // I DONT PLAY SLIDES BRO IDK IF THESE ARE THE SAME OR NOT PLEASE HELP
-				{ 
 					type: 'toggle',
 					key: 'jumpInfo', 
 					label: 'Jump Info', 
 					star: { title: 'Requires a reload (F5)' },
 					desc: 'Replaces the trending now section of UI with jump info.'
+				},
+				{ 
+					type: 'toggle',
+					key: 'Editortweakstoggle', 
+					label: 'Editor tweaks', 
+					desc: 'Adds editor tweaks to the krunker editor.'
 				},
 			]
 		},

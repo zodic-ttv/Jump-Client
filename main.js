@@ -1,8 +1,7 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-
 const internalCssDir = path.join(__dirname, 'Assets', 'css');
 const baseDir = app.isPackaged ? path.dirname(process.execPath) : __dirname;
 const dirs = {
@@ -12,7 +11,7 @@ const dirs = {
 const exts = { css: '.css', scripts: '.js' };
 const configPath = path.join(app.getPath('userData'), 'client-config.json');
 const cssKeys = new Map();
-
+let skipUnloadPrompt = false;
 const defaultSettings = {
   startMode: 'remember',
   uncapFps: true,
@@ -26,6 +25,7 @@ const defaultSettings = {
   highPerformanceGpu: false,
   angleBackend: 'default',
   jumpInfo: true,
+  Editortweakstoggle: true,
 };
 const startModes = ['remember', 'windowed', 'maximized', 'fullscreen'];
 const angleBackends = ['default', 'd3d11', 'gl', 'd3d11on12'];
@@ -90,6 +90,7 @@ app.setAppUserModelId('com.krunkerclient.app');
 
 const GAME_URL = 'https://krunker.io';
 const APP_NAME = 'Jump Client';
+const WINDOW_ICON = path.join(__dirname, 'Assets', 'icon.ico');
 
 function ensureDirs() {
   for (const dir of Object.values(dirs)) {
@@ -128,7 +129,6 @@ async function insertCss(webContents, name) {
     console.error('CSS error in', name, err);
   }
 }
-
 async function applyCss(webContents) {
   cssKeys.clear();
   for (const file of listFiles('css')) {
@@ -167,7 +167,77 @@ function isGameUrl(url) {
     return false;
   }
 }
+function guardUnload(contents, parent) {
+  contents.on('will-prevent-unload', (event) => {
+    if (skipUnloadPrompt) {
+      event.preventDefault();
+      return;
+    }
 
+    const choice = dialog.showMessageBoxSync(parent, {
+      type: 'question',
+      buttons: ['Leave', 'Stay'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Leave this page?',
+      message: 'The page is asking you to confirm before leaving. Unsaved progress may be lost.'
+    });
+
+    if (choice === 0) event.preventDefault();
+  });
+}
+
+function applyBranding(win) {
+  const apply = () => {
+    if (win.isDestroyed()) return;
+    win.setTitle(APP_NAME);
+    win.setIcon(WINDOW_ICON);
+  };
+
+  apply();
+
+  win.on('page-title-updated', (event) => {
+    event.preventDefault();
+    apply();
+  });
+
+  win.webContents.on('did-finish-load', apply);
+  win.webContents.on('did-navigate-in-page', apply);
+}
+app.on('browser-window-created', (event, win) => {
+  applyBranding(win);
+});
+function openIndependentWindow(url) {
+  
+  const child = new BrowserWindow({
+    width: 1100,
+    height: 750,
+    title: APP_NAME,
+    icon: WINDOW_ICON,
+    autoHideMenuBar: true,
+    backgroundColor: '#000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  });
+  applyBranding(child);
+  guardUnload(child.webContents, child);
+  child.webContents.setWindowOpenHandler(handleWindowOpen);
+  attachShortcuts(child);
+  child.loadURL(url);
+}
+
+function handleWindowOpen({ url }) {
+  if (isGameUrl(url)) {
+    openIndependentWindow(url);
+  } else {
+    shell.openExternal(url);
+  }
+  return { action: 'deny' };
+}
 function applyStartMode(win, mode, saved) {
   let target = mode;
   if (mode === 'remember') {
@@ -180,11 +250,31 @@ function applyStartMode(win, mode, saved) {
   if (target === 'fullscreen') win.setFullScreen(true);
   else if (target === 'maximized') win.maximize();
 }
+function attachShortcuts(win) {
+    win.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+
+      const devtoolsCombo = input.control && input.shift && input.key.toLowerCase() === 'i';
+
+      if (input.key === 'F11') {
+        win.setFullScreen(!win.isFullScreen());
+        event.preventDefault();
+      } else if (input.key === 'F5') {
+        win.webContents.reload();
+        event.preventDefault();
+      } else if (input.key === 'F6') {
+        win.loadURL(GAME_URL);
+        event.preventDefault();
+      } else if (input.key === 'F12' || devtoolsCombo) {
+        win.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
+  }
 
 ipcMain.on('settings:get', (event) => {
   event.returnValue = loadConfig().settings;
 });
-
 ipcMain.handle('settings:set', (event, key, value) => {
   if (!Object.prototype.hasOwnProperty.call(defaultSettings, key)) return false;
   if (typeof value !== typeof defaultSettings[key]) return false;
@@ -196,31 +286,27 @@ ipcMain.handle('settings:set', (event, key, value) => {
   saveConfig(config);
   return true;
 });
-
 ipcMain.handle('app:quit', () => {
+  skipUnloadPrompt = true;
   app.quit();
 });
-
 ipcMain.handle('app:relaunch', () => {
+  skipUnloadPrompt = true;
   app.relaunch();
   app.quit();
 });
-
 ipcMain.handle('files:list', (event, type) => {
   if (!dirs[type]) return [];
   return listFiles(type);
 });
-
 ipcMain.handle('files:open', (event, type, name) => {
   if (!dirs[type]) return;
   openInEditor(filePath(type, name));
 });
-
 ipcMain.handle('files:folder', (event, type) => {
   if (!dirs[type]) return;
   shell.openPath(dirs[type]);
 });
-
 ipcMain.handle('files:toggle', async (event, type, name, enabled) => {
   if (!dirs[type]) return false;
   const config = loadConfig();
@@ -252,6 +338,8 @@ function createWindow() {
   const mode = config.settings.startMode;
   const saved = config.windowState;
 
+  
+
   const options = {
     width: 1280,
     height: 720,
@@ -274,27 +362,8 @@ function createWindow() {
   }
 
   const win = new BrowserWindow(options);
-  win.webContents.on('preload-error', (event, preloadPath, error) => {
-    console.log('preload error:', preloadPath, error && error.message);
-  });
+
   console.log('patched electron:', typeof win.setFrameCap === 'function');
-  win.webContents.on('did-fail-load', (event, code, description, url, isMainFrame) => {
-    if (isMainFrame) console.log('main page failed:', code, description, url);
-  });
-  win.webContents.on('render-process-gone', (event, details) => {
-    console.log('renderer gone:', details.reason);
-  });
-  win.webContents.on('did-finish-load', () => {
-    console.log('page loaded:', win.webContents.getURL());
-  });
-  win.once('ready-to-show', () => {
-    console.log('window ready to show');
-  });
-
-  win.on('page-title-updated', (event) => {
-    event.preventDefault();
-  });
-
   win.on('close', () => {
     const latest = loadConfig();
     latest.windowState = {
@@ -318,14 +387,8 @@ function createWindow() {
     
   });
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isGameUrl(url)) {
-      win.loadURL(url);
-    } else {
-      shell.openExternal(url);
-    }
-    return { action: 'deny' };
-  });
+  guardUnload(win.webContents, win);
+  win.webContents.setWindowOpenHandler(handleWindowOpen);
 
   win.webContents.on('will-navigate', (event, url) => {
     if (!isGameUrl(url)) {
@@ -334,27 +397,10 @@ function createWindow() {
     }
   });
 
-  win.webContents.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown') return;
-
-    if (input.key === 'F11') {
-      win.setFullScreen(!win.isFullScreen());
-      event.preventDefault();
-    } else if (input.key === 'F5') {
-      win.webContents.reload();
-      event.preventDefault();
-    } else if (input.key === 'F6') {
-      win.loadURL(GAME_URL);
-      event.preventDefault();
-    } else if (input.key === 'F12') {
-      win.webContents.toggleDevTools();
-      event.preventDefault();
-    }
-  });
+  attachShortcuts(win);
 
   win.loadURL(GAME_URL);
 }
-
 app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     app.dock.setIcon(path.join(__dirname, 'icon.png'));
