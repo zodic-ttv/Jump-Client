@@ -35,14 +35,19 @@ function createSettingsUi(settings, onSettingChanged) {
 				{ 
 					type: 'link', 
 					key: 'https://docs.google.com/spreadsheets/d/1A2BN53JPHVO-P8HDVRZ6_DeqnRA20mktAKw5j4VneL0/edit#gid=1888109361', 
-					label: 'Maps list:' 
+					label: 'Parkour maps list:' 
 				},
 				{ 
-					type: 'toggle', 
+					type: 'link', 
+					key: 'https://docs.google.com/spreadsheets/d/1Gx8TM1T2aOdHSR2qFR9Y9F63638gFEfBBQondoNAsX0/edit?usp=sharing', 
+					label: 'Slide maps list:' 
+				}, // I DONT PLAY SLIDES BRO IDK IF THESE ARE THE SAME OR NOT PLEASE HELP
+				{ 
+					type: 'toggle',
 					key: 'jumpInfo', 
 					label: 'Jump Info', 
 					star: { title: 'Requires a reload (F5)' },
-					desc: 'Replaces the trending now section of ui with jump info.'
+					desc: 'Replaces the trending now section of UI with jump info.'
 				},
 			]
 		},
@@ -89,7 +94,6 @@ function createSettingsUi(settings, onSettingChanged) {
 		{
 			title: 'UI',
 			items: [
-				{ type: 'toggle', key: 'hideBundlePopups', label: 'Hide Bundle Popups'},
 				{ type: 'toggle', key: 'selectableChat', label: 'Selectable Chat' },
 		
 			]
